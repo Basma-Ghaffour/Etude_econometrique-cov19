@@ -1,0 +1,437 @@
+---
+title: "Version 3"
+author: "Basma Ghaffour, Hajar Essahraoui, Soumeya Jraoui"
+date: "12/05/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+\section{introduction}
+
+Comment les restrictions sanitaires du à la pandémie du Covid-19 ot impacter le PIB des grandes puissances économique ? Rajouter une reférence aux poltiique publique.
+
+Afin de répondre a notres probématique on a fait le choix d'étudier cinq pays qui sont la France, L'Allemagne, la Corée du Sud, Les Etats-Unis aisni que la Chine. Qui sont toutes des grandes puissance économique. Le but de cet étude est de voir comment à les restrictions sanitaire du à la pandémie du Covid-19 ont impacter l'économie. Afin de voir l'impact sur l'économie ont a décider de s'intéresser au PIB, plus particlièrement à la variation du PIB en pourcentage par rapport à la même période de l'années précédente. On est partie avce comme a priori que les restriction sanitaire on pu impacter le PIB des pays. En revache on a eucun a priorie sur comment cet indice a pu impacter la variation du PIB.
+
+\section{Construction de ma base de données}
+
+\subsection{Construction des variables de la base de données}
+  
+Afin d'étudier l'impacte des restrictions sanitaires sur le PIB des grandes puissances économique ont a utiliser deux base de données. 
+
+La première  base de données contient les données sur la varaitions du PIB   trimestrielle en pourcentage par rapport au trimestre précédent par pays qui nous viens de l'OCDE .***https://data.oecd.org/gdp/quarterly-gdp.htm#indicator-chart*** L'indicateur est basé sur le PIB réel donc la variations des prix est pris en compte. De plus les chiffres sont corrigées des influences saisonière.
+
+La seconde base de données contient l'indice de restrictions sanitaire journalière  des pays qui nous viens de world in data ***https://ourworldindata.org/covid-stringency-index***. Cet indicateur utilise 13 indicateurs: la fermetures d’écoles , les fermetures de lieux de travail, l’annulation d’événements publics, les restrictions sur les rassemblements publics, fermetures de transports publics, les exigences relatives au maintien à domicile, des campagnes d’information du public, les restrictions aux mouvements internes, les contrôles des voyages internationaux, politique de mise à l’essai, l’étendue de la recherche des contacts, couvre-visages et la politique en matière de vaccins. Il nous indique donc le niveau de rigueur des politique gouvernementales. La valeur de cet indicateur de restriction sanitaire est compris entre 0 et 100. Un indice à 100 indique le niveau de riguer des poltiques gouvernementales le plus élevé. 
+
+Détail du calcul de l'indice:***https://github.com/OxCGRT/covid-policy-tracker/blob/master/documentation/index_methodology.md***
+
+Afin d'étudier cet relation on va devoir crée une base de données. Le but étant de réunir sur une même base de données la variation  du PIB en pourcentage ainsi que l'indice de rigueur sanitaire pour nos cinq pays de début 2017 à fin 2020. Le fait est que pour la variation du PIB les données sont trimestrielle et pour l'indice de rigueur sanitaire les données sont journalière. On a fait le choix dans un premier temp de faire la moyenne par trimestre des indices de restrictions sanitaire journalière afin de contruire notre base de données. Puis dans un second temp de faire la médiane par trimestre. Par la suite nous verrons quelle méthode serais la plus pertinente.
+
+On a choisie d'ordonnées nos cinq pays pour la cosntruction de notre base de donnée comme suit:
+
+- 1: La France
+- 2: L'Allemagne
+- 3: La Corée du sud
+- 4: Les Etats-Unis
+- 5: La Chine
+C'est un ordre que l'on gardera tout au long du code afin de simplifier la construction en définissant des boucles pour automatisée le calcul des vecteurs dont nous aurons besoin sera le même pour les cinq pays.
+
+\subsubsection{création de la variable DGDP}
+
+
+```{r,echo=TRUE,message=FALSE,warning=FALSE}
+dataPIB<-read.table("GDPV1.csv",header=TRUE,sep=",",dec=".") 
+Pays<-c("FRA","DEU","KOR","USA","CHN")
+DGDP<-c()
+library(dplyr)
+for (i in 1:5){
+DGDP[i]<-select(assign(x=paste("dataPIB",i,sep=""),
+                      value=subset(dataPIB,dataPIB$ï..LOCATION==Pays[i])),Value)
+}
+DGDP<-unlist(DGDP)
+
+```
+
+Dans un premier temp on à importer la base de données contenant les imformations sur la variation du PIB que l'on a nommer dataPIB. Ensuite on a crée un vecteur contenant les pays que l'on étudie dans l'ordre que l'on à définie précédement. Puis on a définie une boucle qui va récpéré à chauque fois une base de données contenant les observations uniquement pour le $i^e$ pays de notre vecteur pays.On a nommer à chauque fois chauque base de données $dataPIB_i$ $\forall i\in[1,5]$. Dont on va selectionner uniquement le vecteur (de la variable Value) de la varaition du PIB pour le $i^e$ pays. Et enfin le vecteur DGDP va récupéré comme son $i^e$ élément les vecteurs de la variation du PIB qui a été séléctionner pour nos 5 pays. On aura donc un vecteur DGDP qui contient 5 liste ordonnée dans le temps de la variation du PIB pour chaque pays. Puis on a defini  le vecteur DGDP comme un unique vecteur de donnée et non comme un vectuer  de listes, ce sera donc la première variable de notre nouvelle base de données.
+
+\subsubsection{création de la variable moyIDC }
+
+Pour les indices de restriction sanitaire on a des données disponible uniquement à partir de début 2020. Donc afin de donner la moyenne des restriction sanitaire par trimestre et par pays on va se concentrer sur la période de début 2020 a fin 2021. Pour la période de début 2017 à fin 2019 comme on était pas encore en période de pandémie et que les resriction sanitaire n'avait pas eu lieu on va supposer que l'indice était de 0.
+
+```{r}
+day<-c("2020-01-21","2020-03-31","2020-04-01",
+  "2020-06-30","2020-07-01","2020-09-30",
+  "2020-10-01","2020-12-31","2021-01-01",
+  "2021-03-31","2021-04-01","2021-06-30",
+  "2021-07-01","2021-09-30","2021-10-01",
+  "2021-12-31") 
+
+dataIDC<-read.csv("indiceCOV.csv",header=TRUE,sep=",",dec=".")
+
+for (i in 1:5) {
+  assign(x=paste("dataIDC",i,sep=""),value=subset(dataIDC,dataIDC$Code==Pays[i]))
+}
+for (i in 1:5) {
+  assign(x=paste("numday",i,sep=""),value=c())
+}
+
+for(i in 1:5){
+  assign(x=paste("moyIDC",i,sep=""),value=c())
+}
+```
+
+On a donc commencer par crée un vecteur day qui contient les date de debut et fin trimestre qui nous sera utile pour caluler la moyenne par trimestre, les dates étant une variable de la base de données contenant les indices. On a ensuite importer cette base de données. Puis on a crée une boucle qui nous permet de crée plusieurs bases de donnée contenant les indice de restriction pour les observations correspondant uniquement au $i^e$ pays de notre vecteur Pays définie précédement.On a nommer a chauque fois chaque base de donnée $dataIDCi$ $\forall i\in[1,5]$.Par la suite on a définie deux nouvelle boucle qui définissent les vecteurs numaday ainsi que moyIDC. On leur affecte le vecteur nul, on crée deux vecteur nul qui nous serons utile par la suite lorsque l'on va leur affecter une valeur.On a nommer achaque vecteur $numdayi$ et $moyIDCi$ $\forall i\in[1,5]$ correspondant toujours à la numérotation ordonnée de nos 5 pays. Le vecteur $numdayi$ va contenir les numéros des lignes pour chaque date de début et fin de trimestre pour chauque pays, qui nous sera utile pour calculer ensuite la moyenne qui elle sera inclue dans le vecteur $moyIDCi$.
+
+```{r}
+
+#Pour la France
+for (i in 1:16) {
+  numday1[i]<-grep(day[i],dataIDC1$Day)
+}
+IDC1<-dataIDC1[,4]
+for (i in seq(1,15,by=2)) {
+ moyIDC1[i]<-mean(IDC1[numday1[i]:numday1[i+1]]) 
+}
+moyIDC1<-moyIDC1[!is.na(moyIDC1)]
+moyIDC1<-c(rep(0,12),moyIDC1)
+
+#Pour l'Allemagne
+for (i in 1:16) {
+  numday2[i]<-grep(day[i],dataIDC2$Day)
+}
+IDC2<-dataIDC2[,4] 
+for (i in seq(1,15,by=2)) {
+ moyIDC2[i]<-mean(IDC2[numday2[i]:numday2[i+1]]) 
+}
+moyIDC2<-moyIDC2[!is.na(moyIDC2)]
+moyIDC2<-c(rep(0,12),moyIDC2)
+
+#Pour la Corée du Sud
+for (i in 1:16) {
+  numday3[i]<-grep(day[i],dataIDC3$Day)
+}
+IDC3<-dataIDC3[,4]
+for (i in seq(1,15,by=2)) {
+ moyIDC3[i]<-mean(IDC3[numday3[i]:numday3[i+1]]) 
+}
+moyIDC3<-moyIDC3[!is.na(moyIDC3)]
+moyIDC3<-c(rep(0,12),moyIDC3)
+
+#Pour les Etats Unis
+for (i in 1:16) {
+  numday4[i]<-grep(day[i],dataIDC4$Day)
+}
+IDC4<-dataIDC4[,4]
+for (i in seq(1,15,by=2)) {
+ moyIDC4[i]<-mean(IDC4[numday4[i]:numday4[i+1]]) 
+}
+moyIDC4<-moyIDC4[!is.na(moyIDC4)]
+moyIDC4<-c(rep(0,12),moyIDC4)
+
+# Pour la Chine
+for (i in 1:16) {
+  numday5[i]<-grep(day[i],dataIDC5$Day)
+}
+IDC5<-dataIDC5[,4]
+for (i in seq(1,15,by=2)) {
+ moyIDC5[i]<-mean(IDC5[numday5[i]:numday5[i+1]]) 
+}
+moyIDC5<-moyIDC5[!is.na(moyIDC5)]
+moyIDC5<-c(rep(0,12),moyIDC5)
+```
+
+Ici on va répéter la même procédure cinq fois, chaque procédure correspond à un pays dans la numérotation a été précédement définie. Pour le $i^e$ pays on a affecter à $numday_i$ le numero de la ligne de chaque date (de chauque début et fin de trimestre ordonnée par années ) de $dataIDC_i$.Ensuite on a selectionner uniquement la $4^e$ colonne de $dataIDC_i$ et on a défini comme vecteur $IDC_i$ qui nous donne le vecteur des indices journalier pour le $i^e$ pays. Afin de faire une boucle qui affecter la valeur de la moyenne entre chaque début et fin de trimestre des indice pour me $i^e$ pays. Donc la moyenne pour chaque trimestre.Avec comme identification pour le début et la fin de chauqe trimstre le numero des ligne donner par $numday_i$ que l'on avait défini précédement. Lors de la procédure on a eu des valeurs non attribué qui sont apparue en plus donc on les a supprimer pour chaque $moyIDC_i$. Et enfin on a fait une repétition de 0 12 fois qui correspondent a la moyenne des idnice pour la période de debut 2017 a fin 2019 periode pour laquel on a supposé l'indice nul.
+
+```{r}
+moyIDC<-c(moyIDC1,moyIDC2,moyIDC3,moyIDC4,moyIDC5)
+```
+On a donc crée comme $2^e$ variable  moyIDC qui contient la moyenne des indices de restriction sanitaire pour chauque pays dans l'odre que l'on a définie pour nos pays.
+
+\subsection{création de la variable medIDC}
+
+Ici on faire exactement la même procédure que pour la création de la variable moyIDC. Seulement la différence ici c'est que l'on va faire la médiane par trimestre et non la moyenne. Le but est de voir si en prenant la médiane on peut obtenir de meilleur résultat et omettre l'effet de valeur extreme sur la avaleur de la moyenne qui pourrai potentielement biaisé nos résultat. ***Le but est de voir si en prenant la médiane par trimestre on peut obtenir de meilleur résultat, dont l'interprétation serais différente que si on aurai utilser la moyenne par trimestre***
+
+```{r}
+for(i in 1:5){
+  assign(x=paste("medIDC",i,sep=""),value=c())
+}
+
+#Pour la France
+for (i in 1:16) {
+  numday1[i]<-grep(day[i],dataIDC1$Day)
+}
+IDC1<-dataIDC1[,4]
+for (i in seq(1,15,by=2)) {
+ medIDC1[i]<-median(IDC1[numday1[i]:numday1[i+1]]) 
+}
+medIDC1<-medIDC1[!is.na(medIDC1)]
+medIDC1<-c(rep(0,12),medIDC1)
+
+#Pour l'Allemagne
+for (i in 1:16) {
+  numday2[i]<-grep(day[i],dataIDC2$Day)
+}
+IDC2<-dataIDC2[,4] 
+for (i in seq(1,15,by=2)) {
+ medIDC2[i]<-median(IDC2[numday2[i]:numday2[i+1]]) 
+}
+medIDC2<-medIDC2[!is.na(medIDC2)]
+medIDC2<-c(rep(0,12),medIDC2)
+
+#Pour la Corée du Sud
+for (i in 1:16) {
+  numday3[i]<-grep(day[i],dataIDC3$Day)
+}
+IDC3<-dataIDC3[,4]
+for (i in seq(1,15,by=2)) {
+ medIDC3[i]<-median(IDC3[numday3[i]:numday3[i+1]]) 
+}
+medIDC3<-medIDC3[!is.na(medIDC3)]
+medIDC3<-c(rep(0,12),medIDC3)
+
+#Pour les Etats Unis
+for (i in 1:16) {
+  numday4[i]<-grep(day[i],dataIDC4$Day)
+}
+IDC4<-dataIDC4[,4]
+for (i in seq(1,15,by=2)) {
+ medIDC4[i]<-median(IDC4[numday4[i]:numday4[i+1]]) 
+}
+medIDC4<-medIDC4[!is.na(medIDC4)]
+medIDC4<-c(rep(0,12),medIDC4)
+
+# Pour la Chine
+for (i in 1:16) {
+  numday5[i]<-grep(day[i],dataIDC5$Day)
+}
+IDC5<-dataIDC5[,4]
+for (i in seq(1,15,by=2)) {
+ medIDC5[i]<-median(IDC5[numday5[i]:numday5[i+1]]) 
+}
+medIDC5<-medIDC5[!is.na(medIDC5)]
+medIDC5<-c(rep(0,12),medIDC5)
+
+medIDC<-c(medIDC1,medIDC2,medIDC3,medIDC4,medIDC5)
+```
+
+On a donc crée comme $3^e$ variable  medIDC qui contient la médiane des indices de restriction sanitaire pour chauque pays dans l'odre que l'on a définie pour nos pays.
+
+\subsubsection{Création de la variable Date}
+
+```{r}
+Date<-c("2017-Q1","2017-Q2","2017-Q3","2017-Q4",
+         "2018-Q1","2018-Q2","2018-Q3","2018-Q4",
+         "2019-Q1","2019-Q2","2019-Q3","2019-Q4",
+         "2020-Q1","2020-Q2","2020-Q3","2020-Q4",
+         "2021-Q1","2021-Q2","2021-Q3","2021-Q4")
+Date<-c(rep(Date,5))
+
+```
+
+On a crée comme $4^e$ vaiable Date qui nous indique pour chaque observation la date à laquelle elle a été observer.
+
+\subsubsection{création de la variable Pays}
+
+```{r}
+Pays<-c(rep("France",20),rep("Allemagne",20),
+        rep("Corée du Sud",20), rep("USA",20),rep("Chine",20))
+```
+
+On a crée comme $5^e$ variable la variable Pays qui nous indique pour chauque observation dans quelle pays elle a été observer.
+
+\subsubsection{création de la varaible FR}
+
+```{r}
+FR<-c(rep(1,20),rep(0,80))
+```
+On a crée une variable indicatrice pour imformer si l'observation est en France ou non. Comme on avait ordonée nos pays précédement alors on on sait déja que les 20 première observations sont en France. Ce qui nous permet de faire des répetitions de 1 ou 0 dans l'odre de nos observation.
+On a donc crée comme $6^e$ variable la variable indicatrice FR qui nous indique si l'observation provient de la France ou non.
+
+Pour les autre variables indicatrices de tout nos autre pays la procédure est la même.
+
+
+\subsubsection{création de la variable ALL}
+
+```{r}
+ALL<-c(rep(0,20),rep(1,20),rep(0,60))
+```
+
+On a crée comme $7^e$ variable la variable indicatrice ALL qui nous indique si l'observation provient de l'Allemagne ou non.
+
+\subsubsection{création de la variable KOR}
+
+```{r}
+KOR<-c(rep(0,40),rep(1,20),rep(0,40))
+```
+
+On a crée comme $8^e$ variable la variable indicatrice KOR qui nous indique si l'observation provient de Corée du Sud ou non.
+
+\subsubsection{création de la variable USA}
+
+```{r}
+USA<-c(rep(0,60),rep(1,20),rep(0,20))
+```
+
+On a crée comme $9^e$ variable la variable indicatrice USA qui nous indique si l'observation provient des Etats-Unis ou non.
+
+\subsubsection{création de la variable CHN}
+```{r}
+CHN<-c(rep(0,80),rep(1,20))
+```
+
+On a crée comme $10^e$ variable la variable indicatrice CHN qui nous indique si l'observation provient de la Chine ou non.
+
+
+\subsection{Construction de la base de données}
+
+Pour crée notre nouvelle base de données on aura simplement à affecter a des variables tous les vecteurs que l'on a définie précédement.
+
+```{r}
+data<-data.frame(Pays=Pays, Date=Date, DGDP=DGDP, moyIDC=moyIDC,
+                 medIDC=medIDC, FR=FR, ALL=ALL, KOR=KOR, USA=USA, CHN=CHN)
+```
+
+
+Voici un apercu des première ligne de la base de données.
+```{r,echo=FALSE}
+head(data,n=20)
+```
+
+
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+require(stargazer)
+stargazer(data,header=FALSE)
+
+```
+Sur ce tablau on peut voir que nos variable dépendante et indépendante contienne des valeur nul ou négatif donc on sait deja que l'on ne pourra pas intégré de logarithme dans nos régression. Les valeur min et max de chaque variables nous permet de voir l'étendu que nos variable peuvent prendre. On peut également voir que on a la meme proportion d'observation pour tout nos pays.
+
+\section{Etude économétrique}
+
+\subsection{impact linéaire de l'indcie de restriction sanitaire}
+
+On va donc dans cette étude économétrique étudier l'impacte de la variable $moyIDC_{i,t}$ sur la variable $DGDP_{i,t}$. On est partie avec comme a priori que il pourrai y avoir une relation entre ces deux variables ce que l'on va vérifier mais sans avoir un a priori sur comment $moyIDC_{i,t}$ pourrai impacter $DGDP_{i,t}$.
+
+On a comme variable dépendante $DGDP_{i,t}$ qui est la varaition en pourcentage du PIB du $i^e$ pays au temps $t$ par rapport au trimestre précédent il est donc définie comme suit:
+
+\begin{center}
+$DGDP_{i,t}=\frac{GDP_{i,t}-GDP_{i,t-1}}{GDP_{i,t-1}}$\\
+\hspace{0.5cm}$DGDP_{i,t}=\frac{\Delta GDP_{i,t}}{GDP_{i,t-1}}$ 
+\end{center}
+
+On est partie avec comme a priori que plus on aurai des restriction plus cela pourrai impacter le taux de variation du PIB des pays. Mais on n'a pas d'apriori sur la facon dont les restrictions sanitaires ont un impact. On va commencer par regarder si les restrictions sanitaire impacte de facon linéaire le taux de variation du PIB.
+On a fait le choix d'étudier 5 pays qui sont de grandes puissance économique néaumoin elle n'on pas le même niveau initiale du taux  vairiation du PIB que l'on devra prendre en compte dans la régression. On va donc commencer par inséré dans la régression une différence de niveau du taux de variation entre les pays à l'aide des variable  indicatrice des pays que l'on a définie.
+Dans notre base de données on a deux variable qui nous donne l'imformation sur l'indice de restriction sanitaire $moyIDC_{i,t}$ et $medIDC_{i,t}$. L'une des questions serai de savoir laquelle de nos deux imformation est la meilleur. Ecce que l'on devrai utiliser la moyenne des indices par trimestre ou la médiane par trimestre. 
+Dans un premier temp on va regarder à l'aide de la variable $moyIDC_i$ et ensuite on va comparer avec la regression lrsuqe l'on utilise la variable $medIDC_i$.
+
+On va utiliser tout au long nos régréssions une règle de décision au seuil de 5%. Si la p-value d'une statistiuque ou d'un coeficient est inférieur à 5% alors on conluera que elle est significatif. De plus lors de nos regression on utilisera la France comme référence.
+
+On va donc estimé comme $1^e$ modèle:
+
+\begin{equation}
+DGDP_{i,t}=\alpha_0ALL+\alpha_1KOR+\alpha_2USA+\alpha_3CHN+\beta_0*moyIDC_{i,t}+u_{i,t} \hspace{5pt} \forall i\in[1,100] \hspace{5pt} ,\forall t\in T
+\end{equation}
+
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+reg1<-lm(DGDP~ALL+KOR+USA+CHN+moyIDC,data=data)
+stargazer(reg1, title="Régression 1",report='vc*ps',header=FALSE,ci=TRUE)
+```
+On trouve que globalement le modèle est très significatif à l'aide de la p-value de Fisher qui est très proche de 0. De plus le modèle explique 20,4% de la variabilité du taux de variation du PIB. Dans cette première regression on peut que voir le $R^2$ ajuster est de 16.2%.
+Le coeficient associé à la variable $moyIDC_{i,t}$ est singificatif au seuil de 5%, on peut donc conclure que il existe bien une relation entre $moyIDC{i,t}$ et $DGDP_{i,t}$. Donc si l'indice de restriction sanitaire auguemente de 1 unité alors le taux de varaition du PIB diminue de 0.032 point de pourcentage en moyenne.
+
+Maintenant on va estimer une régression si on aura utiliser la médiane par trimestre, puis on va comparer laquel de ces deux variable ($medIDC_{i,t}$, $moyIDC_{i,t}$) est la plus pertiente.
+
+On va estimé comme $2^e$  modèle:
+
+\begin{equation}
+DGDP_{i,t}=\alpha_0ALL+\alpha_1KOR+\alpha_2USA+\alpha_3CHN+\beta_0*medIDC_{i,t}+u_{i,t} \hspace{5pt} \forall i\in[1,100] \hspace{5pt} ,\forall t\in T
+\end{equation}
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+reg2<-lm(DGDP~ALL+KOR+USA+CHN+medIDC,data=data)
+stargazer(reg2, title="Régression 2", report=('vc*ps'),header=FALSE,ci=TRUE)
+```
+On trouve dans cette seconde regression que le modèle est globalement singificatif mais on trouve que la variable $medIDC_{i,t}$ n'est pas singificatif au seuil de 5%. De plus 0 est compris dans son intervalle de confiance. Donc on conclue sur cette regression que les restrictions sanitaire n'on pas d'impacte que le taux de varitions du PIB des pays. 
+
+On ne va donc pas utiliser $medIDC_{i,t}$ pour expliquer la variation du taux de variation du PIB des pays. Néaumoins c'est curieux de trouver  que en utilisant deux méthodes différente on trouve que le même indicateur a un impacte dans un cas et pas d'impact dans l'autre. On va continuer l'étude en supposant un impacte mais on sera ramener a nuancé nos propos du fait de ce résultat.
+
+On aurai pu aussi pensé que l'impacte des restricions sanitaire sur le taux de varaiation du PIB pourrai être différent en fonction des pays. Mais on ne pourra pas le tester étant donné que on a vu dans le tabelaux statsituqe de nos varible que l'on a seulement 20 observation par pays. On a trop peu d'observation par pays pour pouvoir faire ce type de regression. Surtout si on ajoute le fait que la médiane pour les variables $medIDC_{i,t}$ et $moyIDC_{i,t}$ est de 0 étant donner que on regarde début 2017 jusqu'a fin 2021 et que la pandémie a eu lieu suelment sur la moitié de cet période. On ne testera donc pas de différence d'effet de l'indice de restriction pour les différent pays. De plus dans cette étude on a choisie des grande puissances économique pour lesquelle on suppose les politiques gouvernementale et économque plus ou moin proche donc penser que l'imapcte des restriction sanitaire pourrai être le même est cohérent. Ce qui ne serai pas le cas si on aurai intégré des pays plutot pauvre qui ne sont pas des puissance économique.
+
+\subsection{impact non linéaire de l'indice de restriction sanitaire}
+
+On a aucun a priori sur la facon dont $moyIDC_{i,t}$ imapct $DGDP_{i,t}$.
+On pourrai tester si l'effet de $moyIDC_{i,t}$ sur $DGDP_{i,t}$ est différent en fonction du niveau initiale de $moyIDC_i$ que l'on prend. En effet peut être l'effet de $moyIDC_{i,t}$ sur $DGDP_{i,t}$ n'est pas le même si le niveau de l'indice est initalemet faible ou initialeemnt élevé. L'effet pourrai être variable et non constant pour vérifier on va inclure $moyIDC_{i,t}^2$ et comparer avec notre $1^e$ regression.
+
+On va estimé comme $3^e$  modèle:
+
+\begin{equation}
+DGDP_{i,t}=\alpha_0ALL+\alpha_1KOR+\alpha_2USA+\alpha_3CHN+\beta_0*moyIDC_{i,t}+\beta_1moyIDC_{i,t}^2+u_{i,t} \hspace{5pt} \forall i\in[1,100] \hspace{5pt} ,\forall t\in T
+\end{equation}
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+data$moyIDCP=data$moyIDC^2
+reg3<-lm(DGDP~ALL+KOR+USA+CHN+moyIDC+moyIDCP,data=data)
+stargazer( reg3,title="Régression 3", report=('vc*ps'),header=FALSE,ci=TRUE)
+```
+
+On trouve dans cette troisième regression que le modèle est globelement singificatif. Le modèle explique 21% de la variablité du taux de variation du PIB. On a un $R^2$ ajusté a 18,7%, qui est donc supérieur au $R^2$ ajusté du modèle de regression 1. Mais on peut voir que il y a seulement $moyIDC_{i,t}^2$ qui est significatif au seuil de 5% $moyIDC_{i,t}$ n'est pas significatif. Donc ce modèle nous indique que l'impacte des restriction sanitaire sur le taux de variation du PIB n'est pas linéaire. Donc que l'effet pourrai être différent en fonction du niveau initiale de l'indice de restriction saniataire. Du fait que $moyIDC_{i,t}$ n'est pas significatif on  ne pourra pas interpréter l'impacte des resction sanitaire sur le taux de variation du PIB car on aurai besoin du coeficient associer a $moyIDC_{i,t}$ pour exprimer $\partial DGDP_{i,t}$.
+***a vérifier***
+Comme on a $moyIDC_{i,t}$ qui n'est pas singificatif on va faire une $4^e$ regression sans cette variable. Avec seuement l'indice de restriction sanitaire au carré.
+
+On va estimé comme $4^e$ modèle:
+
+\begin{equation}
+DGDP_{i,t}=\alpha_0ALL+\alpha_1KOR+\alpha_2USA+\alpha_3CHN+\beta_1moyIDC_{i,t}^2+u_{i,t} \hspace{5pt} \forall i\in[1,100] \hspace{5pt} ,\forall t\in T
+\end{equation}
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+reg4<-lm(DGDP~ALL+KOR+USA+CHN+moyIDCP,data=data)
+stargazer( reg4,title="Régression 4", report=('vc*ps'),header=FALSE,ci=TRUE)
+```
+Dan cette $4^e$ regression le modèle est globaleùent singificatif. Le modèle explique 21,6% de la variablité du taux de variation du PIB. On a un $R^2$ ajusté a 17,47%, ce qui est légerement inférieur au modèle 3 mais légèreent supérieur au modèle 1. L coeficient associé a $moyIDC{i,t}^2$ est significatif. Ce modèle nous indique donc que l'impacte des restriction sanitaire sur le taux de variabilité du PIB est différente n fonction du niveau initial de l'indice de restriction sanitaire. 
+
+On aura donc:
+\begin{center}
+$\partial DGDP_{i,t}=0.001moyIDC_{i,t}$
+\end{center}
+
+Ainsi l'impacte des restrictions sanitaire serai d'autant plus important que l'indice de restriction serai itialement plus élevé.
+
+\subsection{effet de la France sur la regression}
+
+On pourrai tester d'enlever la France de notre base de donné, si l'on trouve des resultat de la nouvelle regression sans la France trop différente c'est que la France avait une tendance très différente des autre pays.
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+data3<-data[data$Pays!="France",]
+reg5<-lm(DGDP~KOR+USA+CHN+moyIDC,data=data3)
+stargazer(reg5, title="Régression 1",report='vc*ps',header=FALSE,ci=TRUE)
+```
+
+On trouve que l'intervalle de confiance du coeficient associé a la variable $moyIDC_{i,t}$ dans le modèle 1 avec la France et le modèle 5 sans la France sont similaire. On (-0.06,-0,004) pour le modèle 1 et (-0.055,-0.004) pour le modèle 5 sans la France.
+
+
+```{r,results='asis',warning=FALSE,message=FALSE,echo=FALSE}
+data3<-data[data$Date=="2020-Q2",]
+Q2<-round(data3[,3],2)
+length(Q2)
+data4<-data[data$Date=="2020-Q1",]
+Q1<-round(data4[,3],2)
+Pays<-data4[,1]
+x<-c(Pays,Q1,Q2)
+D1<-matrix(x,byrow=FALSE,ncol=3,nrow=5)
+colnames(D1)<-c("Pays","2020-Q1","2020-Q2")
+stargazer(D1,header=FALSE)
+```
+
+
+
+
+
+
+
+
+
